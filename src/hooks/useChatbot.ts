@@ -224,6 +224,7 @@ export const useChatbot = () => {
 
   return {
     messages,
+    setMessages,
     currentMessage,
     setCurrentMessage,
     currentStep,

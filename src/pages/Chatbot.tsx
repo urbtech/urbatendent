@@ -19,7 +19,9 @@ const Chatbot = () => {
     orderData,
     setOrderData,
     processUserResponse,
-    currentStep
+    currentStep,
+    setMessages,
+    setCurrentStep
   } = useChatbot();
 
   const handleSendMessage = () => {

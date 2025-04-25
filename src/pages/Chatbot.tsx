@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Camera, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { customerService } from "@/services/customerService";
 
 type Message = {
   id: string;
@@ -49,7 +49,6 @@ const Chatbot = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // Simular a primeira mensagem do bot quando o componente for montado
   useEffect(() => {
     const initialMessage: Message = {
       id: "welcome",
@@ -60,7 +59,6 @@ const Chatbot = () => {
 
     setMessages([initialMessage]);
     
-    // Após breve delay, enviar segunda mensagem para iniciar fluxo
     setTimeout(() => {
       const followupMessage: Message = {
         id: "name-ask",
@@ -73,12 +71,10 @@ const Chatbot = () => {
     }, 1000);
   }, []);
 
-  // Scroll para a última mensagem sempre que houver nova mensagem
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Processar a resposta do usuário com base na etapa atual
   const processUserResponse = (userInput: string) => {
     const botResponses: Message[] = [];
     const updatedOrderData = { ...orderData };
@@ -163,10 +159,8 @@ const Chatbot = () => {
             timestamp: new Date(),
           });
           
-          // Salvar pedido no localStorage
           saveOrder(updatedOrderData);
           
-          // Reset para nova conversa após alguns segundos
           setTimeout(() => {
             botResponses.push({
               id: Date.now().toString(),
@@ -199,7 +193,6 @@ const Chatbot = () => {
 
     setOrderData(updatedOrderData);
     
-    // Adicionar todas as respostas do bot após um pequeno atraso para parecer natural
     if (botResponses.length > 0) {
       setTimeout(() => {
         setMessages(prev => [...prev, ...botResponses]);
@@ -210,7 +203,6 @@ const Chatbot = () => {
   const handleSendMessage = () => {
     if (currentMessage.trim() === "") return;
 
-    // Adicionar mensagem do usuário
     const newUserMessage: Message = {
       id: Date.now().toString(),
       text: currentMessage,
@@ -221,7 +213,6 @@ const Chatbot = () => {
     setMessages(prev => [...prev, newUserMessage]);
     setCurrentMessage("");
     
-    // Processar a resposta com pequeno delay para simular pensamento
     setTimeout(() => {
       processUserResponse(newUserMessage.text);
     }, 500);
@@ -243,13 +234,11 @@ const Chatbot = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Convertendo os arquivos em DataURL
     Array.from(files).forEach(file => {
       const reader = new FileReader();
       reader.onload = () => {
         const dataUrl = reader.result as string;
         
-        // Adicionar a imagem às mensagens
         const newImageMessage: Message = {
           id: Date.now().toString(),
           text: "📷 Imagem enviada",
@@ -259,15 +248,12 @@ const Chatbot = () => {
         
         setMessages(prev => [...prev, newImageMessage]);
         
-        // Adicionar ao array de attachments
         setAttachments(prev => [...prev, { type: "image", url: dataUrl }]);
         
-        // Adicionar à ordem
         const updatedOrderData = { ...orderData };
         updatedOrderData.photos = [...updatedOrderData.photos, dataUrl];
         setOrderData(updatedOrderData);
         
-        // Se for a primeira foto, perguntar se quer enviar mais
         if (currentStep === "ask-photos") {
           setTimeout(() => {
             const responseMessage: Message = {
@@ -284,7 +270,6 @@ const Chatbot = () => {
       reader.readAsDataURL(file);
     });
     
-    // Limpar o input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -322,19 +307,23 @@ const Chatbot = () => {
   };
 
   const saveOrder = (data: OrderData) => {
-    // Obter pedidos existentes ou iniciar um array vazio
+    const customer = customerService.create(
+      data.customerName,
+      data.type!,
+      data.location!
+    );
+
     const existingOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
     
-    // Adicionar novo pedido
     const newOrder = {
       ...data,
       id: Date.now().toString(),
+      customerId: customer.id,
       createdAt: new Date().toISOString(),
     };
     
     const updatedOrders = [newOrder, ...existingOrders];
     
-    // Salvar de volta ao localStorage
     localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
     
     toast({
@@ -349,7 +338,6 @@ const Chatbot = () => {
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-[#F0F2F5] overflow-hidden">
-      {/* Cabeçalho estilo WhatsApp */}
       <div className="bg-[#128C7E] text-white p-4 flex items-center justify-between shadow-md">
         <div className="flex items-center">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white mr-3">
@@ -369,7 +357,6 @@ const Chatbot = () => {
         </Button>
       </div>
       
-      {/* Área de mensagens */}
       <div className="flex-1 overflow-y-auto p-4 bg-[#E5DDD5]">
         {messages.map((message) => (
           <div
@@ -396,7 +383,6 @@ const Chatbot = () => {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Área de entrada */}
       <div className="p-3 bg-[#F0F2F5] border-t border-gray-200 flex items-center">
         <input
           type="file"

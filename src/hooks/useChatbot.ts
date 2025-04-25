@@ -46,6 +46,15 @@ export const useChatbot = () => {
 
     switch (currentStep) {
       case "ask-name":
+        if (!userInput.match(/^[a-zA-Z\s]+$/)) {
+          botResponses.push({
+            id: Date.now().toString(),
+            text: "Nome inválido. Use apenas letras e espaços.",
+            sender: "bot",
+            timestamp: new Date(),
+          });
+          break;
+        }
         updatedOrderData.customerName = userInput;
         botResponses.push({
           id: Date.now().toString(),
@@ -57,22 +66,30 @@ export const useChatbot = () => {
         break;
 
       case "ask-type":
-        const wasteType = userInput.toLowerCase().includes("empresa") ? "empresarial" : "residencial";
-        updatedOrderData.type = wasteType as "empresarial" | "residencial";
-        botResponses.push({
-          id: Date.now().toString(),
-          text: `Entendi! Qual é o tipo de resíduo eletrônico que você precisa descartar? (ex: computadores, celulares, baterias, etc.)`,
-          sender: "bot",
-          timestamp: new Date(),
-        });
-        setCurrentStep("ask-waste-type");
+        if (userInput.toLowerCase() === "empresarial" || userInput.toLowerCase() === "residencial") {
+          updatedOrderData.type = userInput.toLowerCase() as "empresarial" | "residencial";
+          botResponses.push({
+            id: Date.now().toString(),
+            text: "Qual é o tipo de resíduo eletrônico? (Ex.: baterias, computadores)",
+            sender: "bot",
+            timestamp: new Date(),
+          });
+          setCurrentStep("ask-waste-type");
+        } else {
+          botResponses.push({
+            id: Date.now().toString(),
+            text: "Por favor, escolha 'empresarial' ou 'residencial'.",
+            sender: "bot",
+            timestamp: new Date(),
+          });
+        }
         break;
 
       case "ask-waste-type":
         updatedOrderData.wasteType = userInput;
         botResponses.push({
           id: Date.now().toString(),
-          text: `Ótimo! Agora, poderia me informar a sua localidade? (cidade/bairro)`,
+          text: "Qual é o endereço para coleta?",
           sender: "bot",
           timestamp: new Date(),
         });
@@ -83,7 +100,7 @@ export const useChatbot = () => {
         updatedOrderData.location = userInput;
         botResponses.push({
           id: Date.now().toString(),
-          text: `Perfeito! E qual seria o volume aproximado? (ex: 2 computadores, 5kg de cabos, etc.)`,
+          text: "Qual o volume aproximado? (Ex.: 50kg, 10 unidades)",
           sender: "bot",
           timestamp: new Date(),
         });
@@ -94,7 +111,7 @@ export const useChatbot = () => {
         updatedOrderData.volume = userInput;
         botResponses.push({
           id: Date.now().toString(),
-          text: `Quase lá! Seria ótimo se você pudesse enviar fotos dos resíduos para melhor avaliação. Você pode anexar fotos agora ou pular esta etapa.`,
+          text: "Por favor, envie uma foto do resíduo, se possível.",
           sender: "bot",
           timestamp: new Date(),
         });
@@ -102,7 +119,7 @@ export const useChatbot = () => {
         break;
 
       case "ask-photos":
-        if (userInput.toLowerCase().includes("pular")) {
+        if (userInput.toLowerCase() === "pular") {
           completeOrder(updatedOrderData);
         } else {
           botResponses.push({
@@ -116,44 +133,43 @@ export const useChatbot = () => {
         break;
 
       case "confirm-order":
-        if (userInput.toLowerCase().includes("sim")) {
+        if (userInput.toLowerCase() === "confirmar") {
+          saveOrder(updatedOrderData);
           botResponses.push({
             id: Date.now().toString(),
-            text: `Pedido confirmado! Seu código de acompanhamento é #${Math.floor(1000 + Math.random() * 9000)}. Nossa equipe entrará em contato em breve para agendar a coleta.`,
+            text: "Pedido confirmado! Entraremos em contato para agendar a coleta.",
             sender: "bot",
             timestamp: new Date(),
           });
-          
-          saveOrder(updatedOrderData);
-          
-          setTimeout(() => {
-            botResponses.push({
-              id: Date.now().toString(),
-              text: `Posso ajudar com mais alguma coisa?`,
-              sender: "bot",
-              timestamp: new Date(),
-            });
-            setCurrentStep("welcome");
-          }, 2000);
+          setCurrentStep("welcome");
+          setOrderData({
+            customerName: "",
+            type: null,
+            wasteType: null,
+            location: null,
+            volume: null,
+            photos: [],
+            status: "novo",
+            createdAt: new Date(),
+          });
         } else {
           botResponses.push({
             id: Date.now().toString(),
-            text: `Sem problemas! Vamos reiniciar o processo. O resíduo que você deseja descartar é empresarial ou residencial?`,
+            text: "Deseja revisar os dados ou enviar mais fotos?",
             sender: "bot",
             timestamp: new Date(),
           });
-          setCurrentStep("ask-type");
         }
         break;
 
       default:
         botResponses.push({
           id: Date.now().toString(),
-          text: `Para iniciar um pedido de coleta, posso te ajudar agora mesmo. Qual é o seu nome?`,
+          text: "Desculpe, não entendi. Por favor, responda conforme as opções fornecidas.",
           sender: "bot",
           timestamp: new Date(),
         });
-        setCurrentStep("ask-name");
+        break;
     }
 
     setOrderData(updatedOrderData);
@@ -165,30 +181,37 @@ export const useChatbot = () => {
     }
   };
 
-  const saveOrder = (data: OrderData) => {
-    const customer = customerService.create(
-      data.customerName,
-      data.type!,
-      data.location!
-    );
+  const saveOrder = async (data: OrderData) => {
+    try {
+      const customer = customerService.create(
+        data.customerName,
+        data.type!,
+        data.location!
+      );
 
-    const existingOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
-    
-    const newOrder = {
-      ...data,
-      id: Date.now().toString(),
-      customerId: customer.id,
-      createdAt: new Date().toISOString(),
-    };
-    
-    const updatedOrders = [newOrder, ...existingOrders];
-    
-    localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
-    
-    toast({
-      title: "Pedido registrado",
-      description: `O pedido de ${data.customerName} foi registrado com sucesso!`,
-    });
+      const newOrder = {
+        ...data,
+        id: Date.now().toString(),
+        customerId: customer.id,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Substituir localStorage por API ou banco
+      const existingOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
+      const updatedOrders = [newOrder, ...existingOrders];
+      localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
+
+      toast({
+        title: "Pedido registrado",
+        description: `O pedido de ${data.customerName} foi registrado com sucesso!`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao salvar o pedido. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const completeOrder = (data: OrderData) => {

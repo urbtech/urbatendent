@@ -5,7 +5,7 @@ import { User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
-import { AttachmentType } from '@/types/ChatTypes';
+import { AttachmentType, Message } from '@/types/ChatTypes';
 import { useChatbot } from '@/hooks/useChatbot';
 
 const Chatbot = () => {
@@ -27,7 +27,7 @@ const Chatbot = () => {
   const handleSendMessage = () => {
     if (currentMessage.trim() === "") return;
 
-    const newUserMessage = {
+    const newUserMessage: Message = {
       id: Date.now().toString(),
       text: currentMessage,
       sender: "user",
@@ -51,7 +51,7 @@ const Chatbot = () => {
       reader.onload = () => {
         const dataUrl = reader.result as string;
         
-        const newImageMessage = {
+        const newImageMessage: Message = {
           id: Date.now().toString(),
           text: "📷 Imagem enviada",
           sender: "user",
@@ -67,9 +67,9 @@ const Chatbot = () => {
         
         if (currentStep === "ask-photos") {
           setTimeout(() => {
-            const responseMessage = {
+            const responseMessage: Message = {
               id: Date.now().toString(),
-              text: "Obrigado pela foto! Deseja enviar mais fotos ou podemos confirmar seu pedido?",
+              text: "Obrigado pela foto! Digite 'confirmar' para finalizar seu pedido ou envie mais fotos.",
               sender: "bot",
               timestamp: new Date(),
             };

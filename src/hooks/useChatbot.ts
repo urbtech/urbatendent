@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Message, OrderData } from '@/types/ChatTypes';
 import { customerService } from "@/services/customerService";
@@ -111,7 +112,7 @@ export const useChatbot = () => {
         updatedOrderData.volume = userInput;
         botResponses.push({
           id: Date.now().toString(),
-          text: "Por favor, envie uma foto do resíduo, se possível.",
+          text: "Por favor, envie uma foto do resíduo usando o botão da câmera, ou digite 'pular' para finalizar sem foto.",
           sender: "bot",
           timestamp: new Date(),
         });
@@ -124,11 +125,10 @@ export const useChatbot = () => {
         } else {
           botResponses.push({
             id: Date.now().toString(),
-            text: `Por favor, anexe as fotos usando o botão de câmera abaixo.`,
+            text: "Por favor, use o botão da câmera para anexar a foto ou digite 'pular' para continuar sem foto.",
             sender: "bot",
             timestamp: new Date(),
           });
-          // Mantém o mesmo passo para esperar as fotos
         }
         break;
 
@@ -181,6 +181,37 @@ export const useChatbot = () => {
     }
   };
 
+  const completeOrder = (data: OrderData) => {
+    const summary = `
+      Resumo do seu pedido:
+      - Nome: ${data.customerName}
+      - Tipo: ${data.type}
+      - Resíduo: ${data.wasteType}
+      - Local: ${data.location}
+      - Volume: ${data.volume}
+      - Fotos: ${data.photos.length} anexadas
+    `;
+
+    setTimeout(() => {
+      const summaryMessage: Message = {
+        id: Date.now().toString(),
+        text: summary,
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      
+      const confirmMessage: Message = {
+        id: Date.now().toString(),
+        text: "Os dados estão corretos? Digite 'confirmar' para finalizar o pedido.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, summaryMessage, confirmMessage]);
+      setCurrentStep("confirm-order");
+    }, 500);
+  };
+
   const saveOrder = async (data: OrderData) => {
     try {
       const customer = customerService.create(
@@ -212,37 +243,6 @@ export const useChatbot = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const completeOrder = (data: OrderData) => {
-    const summary = `
-      Resumo do seu pedido:
-      - Nome: ${data.customerName}
-      - Tipo: ${data.type}
-      - Resíduo: ${data.wasteType}
-      - Local: ${data.location}
-      - Volume: ${data.volume}
-      - Fotos: ${data.photos.length} anexadas
-    `;
-
-    setTimeout(() => {
-      const summaryMessage: Message = {
-        id: Date.now().toString(),
-        text: summary,
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      
-      const confirmMessage: Message = {
-        id: Date.now().toString(),
-        text: "Os dados estão corretos? Responda com 'sim' para confirmar ou 'não' para reiniciar.",
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, summaryMessage, confirmMessage]);
-      setCurrentStep("confirm-order");
-    }, 500);
   };
 
   return {

@@ -1,7 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { Message, OrderData } from '@/types/ChatTypes';
 import { customerService } from "@/services/customerService";
+import { apiService } from "@/services/apiService";
 import { toast } from "@/hooks/use-toast";
 
 export const useChatbot = () => {
@@ -214,28 +214,49 @@ export const useChatbot = () => {
 
   const saveOrder = async (data: OrderData) => {
     try {
-      const customer = customerService.create(
+      const customer = await customerService.create(
         data.customerName,
         data.type!,
         data.location!
       );
 
-      const newOrder = {
-        ...data,
-        id: Date.now().toString(),
+      const orderPayload = {
+        customerName: data.customerName,
         customerId: customer.id,
-        createdAt: new Date().toISOString(),
+        type: data.type,
+        wasteType: data.wasteType,
+        location: data.location,
+        volume: data.volume,
+        photos: data.photos,
+        status: data.status,
       };
 
-      // Substituir localStorage por API ou banco
-      const existingOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
-      const updatedOrders = [newOrder, ...existingOrders];
-      localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
+      try {
+        await apiService.orders.create(orderPayload);
+        
+        toast({
+          title: "Pedido registrado",
+          description: `O pedido de ${data.customerName} foi registrado com sucesso!`,
+        });
+      } catch (apiError) {
+        // Fallback para localStorage se a API falhar
+        console.warn('API falhou, salvando no localStorage:', apiError);
+        
+        const newOrder = {
+          ...orderPayload,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+        };
 
-      toast({
-        title: "Pedido registrado",
-        description: `O pedido de ${data.customerName} foi registrado com sucesso!`,
-      });
+        const existingOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
+        const updatedOrders = [newOrder, ...existingOrders];
+        localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
+
+        toast({
+          title: "Pedido registrado",
+          description: `O pedido de ${data.customerName} foi registrado com sucesso!`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Erro",

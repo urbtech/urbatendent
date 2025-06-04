@@ -5,25 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, User, Calendar, Trash } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
+import { apiService } from "@/services/apiService";
 
 type OrderStatus = "novo" | "em andamento" | "concluído";
 
 interface Order {
   id: string;
-  customerName: string;
+  customer_name: string;
   type: "empresarial" | "residencial" | null;
-  wasteType: string | null;
+  waste_type: string | null;
   location: string | null;
   volume: string | null;
   photos: string[];
   status: OrderStatus;
-  createdAt: string;
+  created_at: string;
 }
 
 const Orders = () => {
@@ -31,56 +31,115 @@ const Orders = () => {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [currentTab, setCurrentTab] = useState<OrderStatus>("novo");
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Carregar pedidos do localStorage
-    const storedOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
-    setOrders(storedOrders);
-    filterOrders(storedOrders, currentTab);
-  }, [currentTab]);
+    loadOrders();
+  }, []);
+
+  useEffect(() => {
+    filterOrders(orders, currentTab);
+  }, [orders, currentTab]);
+
+  const loadOrders = async () => {
+    try {
+      const apiOrders = await apiService.orders.getAll();
+      setOrders(apiOrders);
+    } catch (error) {
+      // Fallback para localStorage
+      console.warn('API falhou, carregando do localStorage:', error);
+      const localOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
+      const formattedOrders = localOrders.map((order: any) => ({
+        ...order,
+        customer_name: order.customerName,
+        waste_type: order.wasteType,
+        created_at: order.createdAt
+      }));
+      setOrders(formattedOrders);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filterOrders = (allOrders: Order[], status: OrderStatus) => {
     const filtered = allOrders.filter(order => order.status === status);
     setFilteredOrders(filtered);
   };
 
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return { ...order, status: newStatus };
-      }
-      return order;
-    });
-    
-    setOrders(updatedOrders);
-    localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
-    filterOrders(updatedOrders, currentTab);
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      await apiService.orders.updateStatus(orderId, newStatus);
+      
+      const updatedOrders = orders.map(order => {
+        if (order.id === orderId) {
+          return { ...order, status: newStatus };
+        }
+        return order;
+      });
+      
+      setOrders(updatedOrders);
 
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+      }
+      
+      toast({
+        title: "Status atualizado",
+        description: `O pedido foi movido para '${newStatus}'`,
+      });
+    } catch (error) {
+      // Fallback para localStorage
+      console.warn('API falhou, atualizando localStorage:', error);
+      
+      const localOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
+      const updatedLocalOrders = localOrders.map((order: any) => {
+        if (order.id === orderId) {
+          return { ...order, status: newStatus };
+        }
+        return order;
+      });
+      
+      localStorage.setItem("urbtech_orders", JSON.stringify(updatedLocalOrders));
+      loadOrders(); // Recarregar da fonte local
+      
+      toast({
+        title: "Status atualizado",
+        description: `O pedido foi movido para '${newStatus}'`,
+      });
     }
-    
-    toast({
-      title: "Status atualizado",
-      description: `O pedido foi movido para '${newStatus}'`,
-    });
   };
 
-  const deleteOrder = (orderId: string) => {
-    const updatedOrders = orders.filter(order => order.id !== orderId);
-    setOrders(updatedOrders);
-    localStorage.setItem("urbtech_orders", JSON.stringify(updatedOrders));
-    filterOrders(updatedOrders, currentTab);
-    
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder(null);
+  const deleteOrder = async (orderId: string) => {
+    try {
+      await apiService.orders.delete(orderId);
+      
+      const updatedOrders = orders.filter(order => order.id !== orderId);
+      setOrders(updatedOrders);
+      
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(null);
+      }
+      
+      toast({
+        title: "Pedido removido",
+        description: "O pedido foi removido permanentemente",
+      });
+    } catch (error) {
+      // Fallback para localStorage
+      console.warn('API falhou, removendo do localStorage:', error);
+      
+      const localOrders = JSON.parse(localStorage.getItem("urbtech_orders") || "[]");
+      const updatedLocalOrders = localOrders.filter((order: any) => order.id !== orderId);
+      
+      localStorage.setItem("urbtech_orders", JSON.stringify(updatedLocalOrders));
+      loadOrders(); // Recarregar da fonte local
+      
+      toast({
+        title: "Pedido removido",
+        description: "O pedido foi removido permanentemente",
+      });
     }
-    
-    toast({
-      title: "Pedido removido",
-      description: "O pedido foi removido permanentemente",
-    });
   };
 
   const formatDate = (dateString: string) => {
@@ -93,6 +152,14 @@ const Orders = () => {
       minute: '2-digit'
     }).format(date);
   };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto py-6 flex items-center justify-center">
+        <p>Carregando pedidos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6">
@@ -132,12 +199,12 @@ const Orders = () => {
                     >
                       <CardHeader className="py-4">
                         <div className="flex justify-between items-start">
-                          <CardTitle className="text-lg">{order.customerName}</CardTitle>
+                          <CardTitle className="text-lg">{order.customer_name}</CardTitle>
                           <Badge>{order.type}</Badge>
                         </div>
                         <CardDescription className="flex items-center mt-1">
                           <Calendar className="h-4 w-4 mr-1" />
-                          {formatDate(order.createdAt)}
+                          {formatDate(order.created_at)}
                         </CardDescription>
                       </CardHeader>
                     </Card>
@@ -157,12 +224,12 @@ const Orders = () => {
                     >
                       <CardHeader className="py-4">
                         <div className="flex justify-between items-start">
-                          <CardTitle className="text-lg">{order.customerName}</CardTitle>
+                          <CardTitle className="text-lg">{order.customer_name}</CardTitle>
                           <Badge>{order.type}</Badge>
                         </div>
                         <CardDescription className="flex items-center mt-1">
                           <Calendar className="h-4 w-4 mr-1" />
-                          {formatDate(order.createdAt)}
+                          {formatDate(order.created_at)}
                         </CardDescription>
                       </CardHeader>
                     </Card>
@@ -182,12 +249,12 @@ const Orders = () => {
                     >
                       <CardHeader className="py-4">
                         <div className="flex justify-between items-start">
-                          <CardTitle className="text-lg">{order.customerName}</CardTitle>
+                          <CardTitle className="text-lg">{order.customer_name}</CardTitle>
                           <Badge>{order.type}</Badge>
                         </div>
                         <CardDescription className="flex items-center mt-1">
                           <Calendar className="h-4 w-4 mr-1" />
-                          {formatDate(order.createdAt)}
+                          {formatDate(order.created_at)}
                         </CardDescription>
                       </CardHeader>
                     </Card>
@@ -207,9 +274,9 @@ const Orders = () => {
                         <User size={20} />
                       </div>
                       <div>
-                        <CardTitle>{selectedOrder.customerName}</CardTitle>
+                        <CardTitle>{selectedOrder.customer_name}</CardTitle>
                         <CardDescription>
-                          {formatDate(selectedOrder.createdAt)}
+                          {formatDate(selectedOrder.created_at)}
                         </CardDescription>
                       </div>
                     </div>
@@ -228,7 +295,7 @@ const Orders = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500">Tipo de Resíduo</h3>
-                      <p>{selectedOrder.wasteType}</p>
+                      <p>{selectedOrder.waste_type}</p>
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500">Volume</h3>

@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import Chatbot from "./pages/Chatbot";
 import Orders from "./pages/Orders";
 import Home from "./pages/Home";
+import WhatsAppConfig from "./pages/WhatsAppConfig";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/" element={<Home />} />
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/whatsapp-config" element={<WhatsAppConfig />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
